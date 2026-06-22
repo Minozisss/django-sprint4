@@ -3,28 +3,14 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils import timezone
 
 from .constants import POSTS_ON_PAGE
 from .forms import CommentForm, PostForm, UserForm
 from .models import Category, Comment, Post
+from .service import get_posts
 
 User = get_user_model()
-
-
-def get_published_posts(posts=Post.objects):
-    """Берем только те посты, которые уже можно показывать всем."""
-    return posts.annotate(
-        comment_count=Count('comments')
-    ).select_related(
-        'author', 'category', 'location'
-    ).filter(
-        is_published=True,
-        pub_date__lte=timezone.now(),
-        category__is_published=True,
-    ).order_by('-pub_date')
 
 
 def paginate(request, posts):
@@ -35,20 +21,21 @@ def paginate(request, posts):
 def get_post_for_user(post_id, user):
     """Достаем пост: автору свой виден всегда, остальным только публичный."""
     post = get_object_or_404(
-        Post.objects.annotate(comment_count=Count('comments')).select_related(
-            'author', 'category', 'location'
-        ),
+        get_posts(filter_published=False, count_comments=False),
         pk=post_id,
     )
     if post.author == user:
         return post
-    return get_object_or_404(get_published_posts(), pk=post_id)
+    return get_object_or_404(
+        get_posts(count_comments=False),
+        pk=post_id,
+    )
 
 
 def index(request):
     """Показываем главную ленту с опубликованными постами."""
     context = {
-        'page_obj': paginate(request, get_published_posts()),
+        'page_obj': paginate(request, get_posts()),
     }
     return render(request, 'blog/index.html', context)
 
@@ -75,7 +62,7 @@ def category_posts(request, category_slug):
         'category': category,
         'page_obj': paginate(
             request,
-            get_published_posts(category.posts.all()),
+            get_posts(category.posts.all()),
         ),
     }
     return render(request, 'blog/category.html', context)
@@ -84,11 +71,10 @@ def category_posts(request, category_slug):
 def profile(request, username):
     """Показываем профиль и публикации конкретного пользователя."""
     profile_user = get_object_or_404(User, username=username)
-    posts = Post.objects.filter(author=profile_user).annotate(
-        comment_count=Count('comments')
-    ).select_related('author', 'category', 'location').order_by('-pub_date')
-    if request.user != profile_user:
-        posts = get_published_posts(posts)
+    posts = get_posts(
+        profile_user.posts.all(),
+        filter_published=request.user != profile_user,
+    )
     context = {
         'profile': profile_user,
         'page_obj': paginate(request, posts),
@@ -152,7 +138,7 @@ def delete_post(request, post_id):
 @login_required
 def add_comment(request, post_id):
     """Добавляем комментарий к публичному посту."""
-    post = get_object_or_404(get_published_posts(), pk=post_id)
+    post = get_object_or_404(get_posts(count_comments=False), pk=post_id)
     form = CommentForm(request.POST or None)
     if form.is_valid():
         comment = form.save(commit=False)

@@ -3,6 +3,11 @@
 from django import forms
 from django.contrib.auth import get_user_model
 
+from .constants import (
+    DATETIME_INPUT_FORMAT,
+    TEXTAREA_COLS,
+    TEXTAREA_ROWS,
+)
 from .models import Comment, Post
 
 User = get_user_model()
@@ -11,11 +16,21 @@ User = get_user_model()
 class PostForm(forms.ModelForm):
     """Форма для поста, одна и для создания, и для редактирования."""
 
+    pub_date = forms.DateTimeField(
+        input_formats=(DATETIME_INPUT_FORMAT,),
+        widget=forms.DateTimeInput(
+            attrs={'type': 'datetime-local'},
+            format=DATETIME_INPUT_FORMAT,
+        ),
+    )
+
     class Meta:
         model = Post
-        fields = ('title', 'text', 'pub_date', 'location', 'category', 'image')
+        exclude = ('author', 'created_at')
         widgets = {
-            'pub_date': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+            'text': forms.Textarea(
+                attrs={'cols': TEXTAREA_COLS, 'rows': TEXTAREA_ROWS},
+            ),
         }
 
 
@@ -25,6 +40,11 @@ class CommentForm(forms.ModelForm):
     class Meta:
         model = Comment
         fields = ('text',)
+        widgets = {
+            'text': forms.Textarea(
+                attrs={'cols': TEXTAREA_COLS, 'rows': TEXTAREA_ROWS},
+            ),
+        }
 
 
 class UserForm(forms.ModelForm):

@@ -3,6 +3,8 @@
 from django.contrib.auth import get_user_model
 from django.db import models
 
+from .constants import STR_PREVIEW_LENGTH
+
 User = get_user_model()
 
 
@@ -47,7 +49,7 @@ class Category(PublishableModel):
         verbose_name_plural = 'Категории'
 
     def __str__(self):
-        return self.title[:30]
+        return self.title[:STR_PREVIEW_LENGTH]
 
 
 class Location(PublishableModel):
@@ -63,7 +65,7 @@ class Location(PublishableModel):
         verbose_name_plural = 'Местоположения'
 
     def __str__(self):
-        return self.name[:30]
+        return self.name[:STR_PREVIEW_LENGTH]
 
 
 class Post(PublishableModel):
@@ -117,7 +119,7 @@ class Post(PublishableModel):
         ordering = ('-pub_date',)
 
     def __str__(self):
-        return self.title[:30]
+        return self.title[:STR_PREVIEW_LENGTH]
 
 
 class Comment(models.Model):
@@ -127,13 +129,11 @@ class Comment(models.Model):
     post = models.ForeignKey(
         Post,
         on_delete=models.CASCADE,
-        related_name='comments',
         verbose_name='Публикация',
     )
     author = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name='comments',
         verbose_name='Автор',
     )
     created_at = models.DateTimeField(
@@ -144,7 +144,11 @@ class Comment(models.Model):
     class Meta:
         verbose_name = 'комментарий'
         verbose_name_plural = 'Комментарии'
+        default_related_name = 'comments'
         ordering = ('created_at',)
 
     def __str__(self):
-        return self.text[:30]
+        return (
+            f'{self.author}: {self.text[:STR_PREVIEW_LENGTH]} '
+            f'к "{self.post}"'
+        )
